@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.Http;
+using Microsoft.TeamFoundation.Work.WebApi;
+using Microsoft.TeamFoundation.Work.WebApi.Contracts;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 using Polly;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -38,8 +41,40 @@ namespace azuredevops_rest_api
 
             string collectionUrl = args[0];
             string devOpsToken = args[1];
-            int worktItemId = int.Parse(args[2]);
-            TestRetry(collectionUrl, devOpsToken, worktItemId, cancellationToken).Wait();
+            if (false)
+            {
+                int worktItemId = int.Parse(args[2]); //183
+                TestRetry(collectionUrl, devOpsToken, worktItemId, cancellationToken).Wait();
+            }
+            else
+            {
+                string projectName = args[2]; //SampleProject
+                TestWorkItemTypes(collectionUrl, devOpsToken, projectName, cancellationToken).Wait();
+            }
+        }
+
+        private static async Task TestWorkItemTypes(string collectionUrl, string devOpsToken, string projectName, CancellationToken cancellationToken)
+        {
+            var clientCredentials = new VssBasicCredential("", devOpsToken);
+            using var devops = new VssConnection(new Uri(collectionUrl), clientCredentials);
+            await devops.ConnectAsync(cancellationToken);
+
+            using var workClient = await devops.GetClientAsync<WorkHttpClient>(cancellationToken);
+
+            var processConfiguration = await workClient.GetProcessConfigurationAsync(projectName);
+            var backlogWorkItemTypes = new List<CategoryConfiguration>(processConfiguration.PortfolioBacklogs)
+                                       {
+                                           processConfiguration.BugWorkItems,
+                                           processConfiguration.RequirementBacklog,
+                                           processConfiguration.TaskBacklog,
+                                       };
+
+            foreach (var item in backlogWorkItemTypes)
+            {
+                Console.WriteLine(item.Name);
+            }
+
+            devops.Disconnect();
         }
 
         private static async Task TestRetry(string collectionUrl, string devOpsToken, int worktItemId, CancellationToken cancellationToken)
